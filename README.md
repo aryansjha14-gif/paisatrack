@@ -1,12 +1,13 @@
 # PaisaTrack
 
-A clean, private **personal finance & expense tracker** — a single-page dashboard that runs entirely in the browser. Works in **English and Hindi** (toggle in the header, or open with `?lang=hi`).
+A clean, private **personal finance & expense tracker** — a single-page dashboard that runs entirely in the browser. Works in **English and Hindi** (language chooser in the header, or open with `?lang=hi`).
 
 Live site: https://aryansjha14-gif.github.io/paisatrack/
 
 ## Features
 - Track daily income and expenses with category, date and note
 - Add, edit (click a row) and delete transactions
+- **Custom categories** — pick "Other" and type your own name (e.g. Pet care, EMI, Gifts)
 - Live summary cards: balance, income, expenses and savings rate
 - 6-month cash-flow bar chart (income vs. expenses)
 - "Where your money goes" doughnut chart by category
