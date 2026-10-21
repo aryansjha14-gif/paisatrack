@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PaisaTrack — Personal Finance &amp; Expense Tracker</title>
+<meta name="description" content="A clean, private dashboard to track your daily income and expenses with beautiful charts. All data stays in your browser." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#f2f5fb;
+    --card:#ffffff;
+    --ink:#0f172a;
+    --muted:#6b7488;
+    --line:#e7ebf3;
+    --accent:#4f46e5;
+    --accent-soft:#eef0ff;
+    --income:#10b981;
+    --expense:#ef4444;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px -12px rgba(16,24,40,.18);
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 10% -10%, #e9ecff 0%, transparent 55%),
+               radial-gradient(1000px 500px at 100% 0%, #e6fbf3 0%, transparent 50%),
+               var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 20px 70px}
+
+  /* ---------- Top bar ---------- */
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+  .brand{display:flex;align-items:center;gap:13px}
+  .logo{
+    width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:23px;
+    background:linear-gradient(140deg,#4f46e5,#7c6cff);
+    box-shadow:0 10px 22px -8px rgba(79,70,229,.7);
+  }
+  .brand h1{margin:0;font-size:20px;letter-spacing:-.4px}
+  .brand p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+  .top-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  select,input,button{font-family:inherit;font-size:14px}
+  .field{
+    appearance:none;background:var(--card);border:1px solid var(--line);border-radius:11px;
+    padding:9px 12px;color:var(--ink);outline:none;transition:border-color .15s, box-shadow .15s;
+  }
+  .field:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,70,229,.14)}
+  .btn{
+    border:1px solid var(--line);background:var(--card);border-radius:11px;padding:9px 14px;
+    cursor:pointer;color:var(--ink);transition:transform .06s, background .15s, border-color .15s;
+  }
+  .btn:hover{background:#f8f9fe;border-color:#d6dcea}
+  .btn:active{transform:translateY(1px)}
+  .btn.ghost-danger:hover{background:#fff1f1;border-color:#f6c9c9;color:#b91c1c}
+
+  /* ---------- Stat cards ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}
+  .stat{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 18px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+  }
+  .stat .label{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px;font-weight:600;letter-spacing:.2px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .stat .value{font-size:26px;font-weight:750;letter-spacing:-.7px;margin-top:10px}
+  .stat .sub{font-size:12px;color:var(--muted);margin-top:5px}
+  .stat.balance .value{color:var(--accent)}
+  .stat.income .value{color:var(--income)}
+  .stat.expense .value{color:var(--expense)}
+
+  /* ---------- Layout grid ---------- */
+  .grid{display:grid;grid-template-columns:1.55fr 1fr;gap:18px;align-items:start}
+  .panel{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;box-shadow:var(--shadow);
+  }
+  .panel h2{margin:0 0 4px;font-size:15.5px;letter-spacing:-.2px}
+  .panel .hint{margin:0 0 16px;font-size:12.5px;color:var(--muted)}
+  .col{display:flex;flex-direction:column;gap:18px}
+
+  /* ---------- Charts ---------- */
+  .bars{width:100%;height:230px;display:block}
+  .legend{display:flex;gap:16px;margin-top:6px;font-size:12.5px;color:var(--muted);align-items:center}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+
+  .donut-wrap{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  .donut{flex:0 0 auto}
+  .donut-center{font-size:11px;fill:var(--muted)}
+  .donut-center-amt{font-size:17px;font-weight:750;fill:var(--ink)}
+  .cat-list{flex:1 1 200px;display:flex;flex-direction:column;gap:11px;min-width:180px}
+  .cat-row{display:flex;align-items:center;gap:10px;font-size:13px}
+  .cat-row .swatch{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+  .cat-row .name{flex:1 1 auto;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cat-row .amt{font-weight:650;font-variant-numeric:tabular-nums}
+  .cat-row .pct{color:var(--muted);width:38px;text-align:right;font-size:12px}
+  .empty{color:var(--muted);font-size:13px;padding:26px 4px;text-align:center}
+
+  /* ---------- Form ---------- */
+  .seg{display:flex;background:#f1f3fa;border-radius:12px;padding:4px;margin-bottom:16px}
+  .seg button{
+    flex:1;border:0;background:transparent;padding:9px;border-radius:9px;cursor:pointer;
+    color:var(--muted);font-weight:650;transition:.15s;
+  }
+  .seg button.active{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.12)}
+  .seg button.active[data-type="expense"]{color:var(--expense)}
+  .seg button.active[data-type="income"]{color:var(--income)}
+  .form-row{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}
+  .form-row label{font-size:12.5px;color:var(--muted);font-weight:600}
+  .form-row .field{width:100%}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .submit{
+    width:100%;border:0;border-radius:12px;padding:12px;font-weight:700;color:#fff;cursor:pointer;
+    background:linear-gradient(140deg,#4f46e5,#6d5efc);box-shadow:0 10px 20px -10px rgba(79,70,229,.9);
+    transition:transform .06s, filter .15s;
+  }
+  .submit:hover{filter:brightness(1.06)}
+  .submit:active{transform:translateY(1px)}
+
+  /* ---------- Transactions ---------- */
+  .tx-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .tx-list{display:flex;flex-direction:column;gap:2px;max-height:430px;overflow-y:auto;margin:-6px -6px 0;padding:6px}
+  .tx{
+    display:flex;align-items:center;gap:12px;padding:11px 10px;border-radius:12px;transition:background .12s;
+  }
+  .tx:hover{background:#f8f9fe}
+  .tx .icon{
+    width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:16px;flex:0 0 auto;
+  }
+  .tx .mid{flex:1 1 auto;min-width:0}
+  .tx .cat{font-size:13.5px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tx .meta{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tx .amt{font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;white-space:nowrap}
+  .tx .amt.in{color:var(--income)}
+  .tx .amt.out{color:var(--expense)}
+  .tx .del{
+    border:0;background:transparent;color:#c3c9d6;cursor:pointer;font-size:16px;padding:4px 6px;border-radius:8px;
+    opacity:0;transition:.15s;line-height:1;
+  }
+  .tx:hover .del{opacity:1}
+  .tx .del:hover{background:#fff1f1;color:#dc2626}
+
+  footer{margin-top:30px;text-align:center;color:var(--muted);font-size:12px}
+  footer a{color:var(--accent);text-decoration:none}
+
+  @media (max-width:980px){
+    .grid{grid-template-columns:1fr}
+    .stats{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (max-width:560px){
+    .stats{grid-template-columns:1fr 1fr}
+    .stat .value{font-size:21px}
+    .wrap{padding:18px 14px 60px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">💰</div>
+      <div>
+        <h1>PaisaTrack</h1>
+        <p>Personal finance &amp; expense tracker</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <select id="period" class="field" aria-label="Time period">
+        <option value="month">This month</option>
+        <option value="30">Last 30 days</option>
+        <option value="year">This year</option>
+        <option value="all" selected>All time</option>
+      </select>
+      <button id="sample" class="btn" title="Load example data">Load sample</button>
+      <button id="reset" class="btn ghost-danger" title="Delete all data">Clear all</button>
+    </div>
+  </header>
+
+  <section class="stats">
+    <div class="stat balance">
+      <div class="label"><span class="dot" style="background:var(--accent)"></span>Balance</div>
+      <div class="value" id="s-balance">₹0</div>
+      <div class="sub" id="s-balance-sub">Income − expenses</div>
+    </div>
+    <div class="stat income">
+      <div class="label"><span class="dot" style="background:var(--income)"></span>Income</div>
+      <div class="value" id="s-income">₹0</div>
+      <div class="sub" id="s-income-sub">&nbsp;</div>
+    </div>
+    <div class="stat expense">
+      <div class="label"><span class="dot" style="background:var(--expense)"></span>Expenses</div>
+      <div class="value" id="s-expense">₹0</div>
+      <div class="sub" id="s-expense-sub">&nbsp;</div>
+    </div>
+    <div class="stat">
+      <div class="label"><span class="dot" style="background:#f59e0b"></span>Savings rate</div>
+      <div class="value" id="s-save">0%</div>
+      <div class="sub">Of income kept</div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel">
+        <h2>Cash flow</h2>
+        <p class="hint">Income vs. expenses over the last 6 months</p>
+        <svg id="bars" class="bars" viewBox="0 0 640 230" preserveAspectRatio="none" role="img" aria-label="Monthly income and expense bar chart"></svg>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--income)"></span> Income</span>
+          <span><span class="dot" style="background:var(--expense)"></span> Expenses</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Where your money goes</h2>
+        <p class="hint" id="donut-hint">Expense breakdown by category</p>
+        <div class="donut-wrap">
+          <svg id="donut" class="donut" width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="Expense breakdown by category"></svg>
+          <div class="cat-list" id="cat-list"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel">
+        <h2>Add a transaction</h2>
+        <p class="hint">Saved instantly in this browser</p>
+        <form id="form">
+          <div class="seg" id="seg">
+            <button type="button" data-type="expense" class="active">Expense</button>
+            <button type="button" data-type="income">Income</button>
+          </div>
+          <div class="form-row">
+            <label for="amount">Amount (₹)</label>
+            <input id="amount" class="field" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" required />
+          </div>
+          <div class="two">
+            <div class="form-row">
+              <label for="category">Category</label>
+              <select id="category" class="field"></select>
+            </div>
+            <div class="form-row">
+              <label for="date">Date</label>
+              <input id="date" class="field" type="date" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="note">Note <span style="font-weight:400">(optional)</span></label>
+            <input id="note" class="field" type="text" maxlength="60" placeholder="e.g. Lunch with team" />
+          </div>
+          <button class="submit" type="submit" id="submit-btn">Add expense</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="tx-head">
+          <h2 style="margin:0">Recent transactions</h2>
+          <span class="hint" id="tx-count" style="margin:0">0 items</span>
+        </div>
+        <div class="tx-list" id="tx-list"></div>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    Built as a Micro-SaaS starter · 100% client-side, your data never leaves this browser ·
+    <a href="#" id="export">Export JSON</a>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var LS_KEY = "paisatrack.v1";
+  var INCOME_CATS  = ["Salary","Freelance","Business","Investments","Gift","Other income"];
+  var EXPENSE_CATS = ["Food & dining","Rent","Transport","Shopping","Bills & utilities","Entertainment","Health","Education","Groceries","Other"];
+  var CAT_COLORS = ["#4f46e5","#10b981","#f59e0b","#ef4444","#06b6d4","#8b5cf6","#ec4899","#84cc16","#f97316","#64748b","#14b8a6","#a855f7"];
+  var CAT_ICONS = {
+    "Food & dining":"🍽️","Rent":"🏠","Transport":"🚕","Shopping":"🛍️","Bills & utilities":"💡",
+    "Entertainment":"🎬","Health":"🩺","Education":"📚","Groceries":"🛒","Other":"📦",
+    "Salary":"💼","Freelance":"🧑‍💻","Business":"🏢","Investments":"📈","Gift":"🎁","Other income":"➕"
+  };
+
+  var state = { tx: [] };
+  var formType = "expense";
+
+  /* ---------------- storage ---------------- */
+  function load(){
+    try{
+      var raw = localStorage.getItem(LS_KEY);
+      if(raw){ var d = JSON.parse(raw); if(d && Array.isArray(d.tx)) state = d; }
+      else { state.tx = sampleData(); persist(); }
+    }catch(e){ state.tx = []; }
+  }
+  function persist(){
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+  function iso(d){ return d.toISOString().slice(0,10); }
+
+  /* ---------------- sample data ---------------- */
+  function sampleData(){
+    var out = [];
+    var now = new Date();
+    function add(mo, day, type, amount, category, note){
+      var d = new Date(now.getFullYear(), now.getMonth() - mo, day);
+      out.push({ id:uid(), type:type, amount:amount, category:category, date:iso(d), note:note||"" });
+    }
+    for(var m=5;m>=0;m--){
+      add(m, 1, "income", 65000, "Salary", "Monthly salary");
+      add(m, 8, "expense", 18000, "Rent", "House rent");
+      add(m, 12, "expense", 5200, "Groceries", "Monthly groceries");
+      add(m, 15, "expense", 1450, "Bills & utilities", "Electricity + internet");
+      add(m, 18, "expense", 2400, "Transport", "Cab & fuel");
+      add(m, 20, "expense", 1800, "Food & dining", "Eating out");
+      if(m % 2 === 0) add(m, 22, "expense", 3200, "Shopping", "Clothes");
+      if(m === 4 || m === 1) add(m, 25, "income", 12000, "Freelance", "Side project");
+      if(m === 3) add(m, 10, "expense", 2500, "Health", "Checkup");
+      if(m === 2) add(m, 5, "expense", 4000, "Entertainment", "Weekend trip");
+    }
+    return out;
+  }
+
+  /* ---------------- formatting ---------------- */
+  var inr = new Intl.NumberFormat("en-IN", { style:"currency", currency:"INR", maximumFractionDigits:0 });
+  var inr2 = new Intl.NumberFormat("en-IN", { style:"currency", currency:"INR", maximumFractionDigits:0, minimumFractionDigits:0 });
+  function money(n){ return inr.format(Math.round(n)); }
+  function shortMoney(n){
+    var a = Math.abs(n);
+    if(a >= 10000000) return "₹" + (n/10000000).toFixed(a>=100000000?0:1) + "Cr";
+    if(a >= 100000)   return "₹" + (n/100000).toFixed(a>=1000000?0:1) + "L";
+    if(a >= 1000)     return "₹" + (n/1000).toFixed(a>=10000?0:1) + "k";
+    return "₹" + Math.round(n);
+  }
+  function fmtDate(s){
+    var d = new Date(s + "T00:00:00");
+    if(isNaN(d)) return s;
+    return d.toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" });
+  }
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
+
+  /* ---------------- period filtering ---------------- */
+  function periodStart(period){
+    var now = new Date(); now.setHours(0,0,0,0);
+    if(period === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
+    if(period === "30"){ var d = new Date(now); d.setDate(d.getDate() - 29); return d; }
+    if(period === "year") return new Date(now.getFullYear(), 0, 1);
+    return null;
+  }
+  function inPeriod(s){
+    var p = periodStart(document.getElementById("period").value);
+    if(!p) return true;
+    return new Date(s + "T00:00:00") >= p;
+  }
+
+  /* ---------------- rendering ---------------- */
+  function render(){
+    var filtered = state.tx.filter(function(t){ return inPeriod(t.date); });
+    var income = 0, expense = 0;
+    filtered.forEach(function(t){ if(t.type === "income") income += t.amount; else expense += t.amount; });
+    var balance = income - expense;
+    var rate = income > 0 ? Math.round((balance / income) * 100) : 0;
+
+    document.getElementById("s-balance").textContent = money(balance);
+    document.getElementById("s-income").textContent = money(income);
+    document.getElementById("s-expense").textContent = money(expense);
+    document.getElementById("s-save").textContent = (rate < 0 ? "" : "") + rate + "%";
+    document.getElementById("s-balance-sub").textContent = balance >= 0 ? "You're in the green" : "Spending exceeds income";
+    document.getElementById("s-income-sub").textContent = filtered.filter(function(t){return t.type==="income";}).length + " credit entries";
+    document.getElementById("s-expense-sub").textContent = filtered.filter(function(t){return t.type==="expense";}).length + " debit entries";
+
+    renderDonut(filtered);
+    renderBars();
+    renderList();
+  }
+
+  function renderDonut(filtered){
+    var byCat = {};
+    var total = 0;
+    filtered.forEach(function(t){
+      if(t.type !== "expense") return;
+      byCat[t.category] = (byCat[t.category] || 0) + t.amount;
+      total += t.amount;
+    });
+    var entries = Object.keys(byCat).map(function(k){ return { name:k, value:byCat[k] }; })
+                        .sort(function(a,b){ return b.value - a.value; });
+
+    var svg = document.getElementById("donut");
+    var list = document.getElementById("cat-list");
+
+    if(total <= 0){
+      svg.innerHTML = '<circle cx="90" cy="90" r="62" fill="none" stroke="#eef1f7" stroke-width="26"/>' +
+                      '<text x="90" y="86" text-anchor="middle" class="donut-center">No expenses</text>' +
+                      '<text x="90" y="104" text-anchor="middle" class="donut-center">in this period</text>';
+      list.innerHTML = '<div class="empty">Add an expense to see the breakdown.</div>';
+      return;
+    }
+
+    var r = 62, C = 2 * Math.PI * r, offset = 0;
+    var parts = [];
+    entries.forEach(function(e, i){
+      var frac = e.value / total;
+      var len = frac * C;
+      var color = CAT_COLORS[i % CAT_COLORS.length];
+      parts.push('<circle cx="90" cy="90" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="26" ' +
+                 'stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" ' +
+                 'stroke-dashoffset="' + (-offset).toFixed(2) + '" transform="rotate(-90 90 90)"><title>' +
+                 esc(e.name) + ': ' + money(e.value) + '</title></circle>');
+      offset += len;
+    });
+    svg.innerHTML = parts.join("") +
+      '<text x="90" y="84" text-anchor="middle" class="donut-center">Total spent</text>' +
+      '<text x="90" y="105" text-anchor="middle" class="donut-center-amt">' + shortMoney(total) + '</text>';
+
+    list.innerHTML = entries.slice(0, 7).map(function(e, i){
+      var pct = Math.round((e.value / total) * 100);
+      return '<div class="cat-row">' +
+               '<span class="swatch" style="background:' + CAT_COLORS[i % CAT_COLORS.length] + '"></span>' +
+               '<span class="name">' + esc(e.name) + '</span>' +
+               '<span class="amt">' + money(e.value) + '</span>' +
+               '<span class="pct">' + pct + '%</span>' +
+             '</div>';
+    }).join("");
+  }
+
+  function renderBars(){
+    var svg = document.getElementById("bars");
+    var W = 640, H = 230, padL = 46, padR = 12, padT = 14, padB = 34;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    var now = new Date();
+    var months = [];
+    for(var i=5;i>=0;i--){
+      var d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      months.push({ key: d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"),
+                    label: d.toLocaleDateString("en-IN",{month:"short"}),
+                    income:0, expense:0 });
+    }
+    var idx = {};
+    months.forEach(function(m,i){ idx[m.key] = i; });
+    state.tx.forEach(function(t){
+      var k = (t.date||"").slice(0,7);
+      if(idx[k] === undefined) return;
+      months[idx[k]][t.type === "income" ? "income" : "expense"] += t.amount;
+    });
+
+    var max = 0;
+    months.forEach(function(m){ max = Math.max(max, m.income, m.expense); });
+    if(max <= 0) max = 1;
+    var step = Math.pow(10, Math.floor(Math.log10(max))) / 2;
+    var top = Math.ceil(max / step) * step;
+
+    var parts = [];
+    // gridlines + y labels
+    var ticks = 4;
+    for(var g=0; g<=ticks; g++){
+      var y = padT + plotH - (plotH * g / ticks);
+      var val = top * g / ticks;
+      parts.push('<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W-padR) + '" y2="' + y.toFixed(1) + '" stroke="#eef1f7" stroke-width="1"/>');
+      parts.push('<text x="' + (padL-8) + '" y="' + (y+4).toFixed(1) + '" text-anchor="end" font-size="10.5" fill="#9aa3b6">' + shortMoney(val) + '</text>');
+    }
+
+    var groupW = plotW / months.length;
+    var barW = Math.min(20, groupW * 0.28);
+    var gap = 5;
+    months.forEach(function(m, i){
+      var cx = padL + groupW * i + groupW / 2;
+      var xI = cx - barW - gap/2;
+      var xE = cx + gap/2;
+      var hI = (m.income / top) * plotH;
+      var hE = (m.expense / top) * plotH;
+      var baseY = padT + plotH;
+      parts.push('<rect x="' + xI.toFixed(1) + '" y="' + (baseY-hI).toFixed(1) + '" width="' + barW + '" height="' + Math.max(hI,0).toFixed(1) + '" rx="4" fill="var(--income)"><title>' + esc(m.label) + ' income: ' + money(m.income) + '</title></rect>');
+      parts.push('<rect x="' + xE.toFixed(1) + '" y="' + (baseY-hE).toFixed(1) + '" width="' + barW + '" height="' + Math.max(hE,0).toFixed(1) + '" rx="4" fill="var(--expense)"><title>' + esc(m.label) + ' expenses: ' + money(m.expense) + '</title></rect>');
+      parts.push('<text x="' + cx.toFixed(1) + '" y="' + (H-12) + '" text-anchor="middle" font-size="11.5" fill="#6b7488">' + esc(m.label) + '</text>');
+    });
+
+    svg.innerHTML = parts.join("");
+  }
+
+  function renderList(){
+    var list = document.getElementById("tx-list");
+    var items = state.tx.slice().sort(function(a,b){
+      return (b.date + b.id).localeCompare(a.date + a.id);
+    });
+    document.getElementById("tx-count").textContent = items.length + (items.length === 1 ? " item" : " items");
+
+    if(!items.length){
+      list.innerHTML = '<div class="empty">No transactions yet.<br>Add your first one, or load sample data.</div>';
+      return;
+    }
+    list.innerHTML = items.slice(0, 60).map(function(t){
+      var isIn = t.type === "income";
+      var icon = CAT_ICONS[t.category] || (isIn ? "➕" : "📦");
+      var bg = isIn ? "#e7f8f1" : "#f1f2ff";
+      return '<div class="tx">' +
+        '<div class="icon" style="background:' + bg + '">' + icon + '</div>' +
+        '<div class="mid">' +
+          '<div class="cat">' + esc(t.category) + '</div>' +
+          '<div class="meta">' + fmtDate(t.date) + (t.note ? " · " + esc(t.note) : "") + '</div>' +
+        '</div>' +
+        '<div class="amt ' + (isIn ? "in" : "out") + '">' + (isIn ? "+" : "−") + money(t.amount).replace("₹","₹") + '</div>' +
+        '<button class="del" title="Delete" data-id="' + t.id + '">✕</button>' +
+      '</div>';
+    }).join("");
+  }
+
+  /* ---------------- form ---------------- */
+  function fillCategories(){
+    var sel = document.getElementById("category");
+    var cats = formType === "income" ? INCOME_CATS : EXPENSE_CATS;
+    sel.innerHTML = cats.map(function(c){ return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join("");
+  }
+  function setType(t){
+    formType = t;
+    Array.prototype.forEach.call(document.querySelectorAll("#seg button"), function(b){
+      b.classList.toggle("active", b.dataset.type === t);
+    });
+    fillCategories();
+    document.getElementById("submit-btn").textContent = t === "income" ? "Add income" : "Add expense";
+  }
+
+  /* ---------------- events ---------------- */
+  function bind(){
+    document.getElementById("seg").addEventListener("click", function(e){
+      var b = e.target.closest("button[data-type]");
+      if(b) setType(b.dataset.type);
+    });
+
+    document.getElementById("period").addEventListener("change", render);
+
+    document.getElementById("form").addEventListener("submit", function(e){
+      e.preventDefault();
+      var amt = parseFloat(document.getElementById("amount").value);
+      var date = document.getElementById("date").value;
+      if(!(amt > 0) || !date) return;
+      state.tx.push({
+        id: uid(),
+        type: formType,
+        amount: amt,
+        category: document.getElementById("category").value,
+        date: date,
+        note: document.getElementById("note").value.trim()
+      });
+      persist();
+      document.getElementById("form").reset();
+      document.getElementById("date").value = iso(new Date());
+      document.getElementById("amount").focus();
+      render();
+    });
+
+    document.getElementById("tx-list").addEventListener("click", function(e){
+      var b = e.target.closest("button.del");
+      if(!b) return;
+      var id = b.dataset.id;
+      state.tx = state.tx.filter(function(t){ return t.id !== id; });
+      persist(); render();
+    });
+
+    document.getElementById("reset").addEventListener("click", function(){
+      if(!state.tx.length) return;
+      if(confirm("Delete all transactions? This cannot be undone.")){
+        state.tx = []; persist(); render();
+      }
+    });
+
+    document.getElementById("sample").addEventListener("click", function(){
+      if(state.tx.length && !confirm("Replace current data with sample data?")) return;
+      state.tx = sampleData(); persist(); render();
+    });
+
+    document.getElementById("export").addEventListener("click", function(e){
+      e.preventDefault();
+      var blob = new Blob([JSON.stringify(state, null, 2)], { type:"application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "paisatrack-data.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  }
+
+  /* ---------------- init ---------------- */
+  load();
+  bind();
+  setType("expense");
+  document.getElementById("date").value = iso(new Date());
+  render();
+})();
+</script>
+</body>
+</html>
