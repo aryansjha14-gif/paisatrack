@@ -1,0 +1,9 @@
+{
+  "name": "paisatrack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PaisaTrack — a clean personal finance & expense tracker (English + Hindi) with optional encrypted cross-device sync.",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
