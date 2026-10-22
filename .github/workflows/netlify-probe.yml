@@ -8,9 +8,10 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe Netlify reachability
+      - name: Check live endpoints
         run: |
-          for h in api.netlify.com netlify-mcp.netlify.app app.netlify.com; do
-            printf '%-30s ' "$h"
-            curl -sS -o /dev/null -w 'HTTP %{http_code}\n' --max-time 20 "https://$h/" || echo 'curl-failed'
+          for u in "https://paisatrack-app.netlify.app/" "https://paisatrack-app.netlify.app/manifest.webmanifest" "https://paisatrack-app.netlify.app/api/sync?key=0123456789abcdef"; do
+            echo "--- $u"
+            curl -sS -o /tmp/body -w 'HTTP %{http_code}\n' --max-time 25 "$u" || echo 'curl-failed'
+            echo "body: $(head -c 300 /tmp/body)"
           done
