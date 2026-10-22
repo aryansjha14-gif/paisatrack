@@ -1,0 +1,19 @@
+name: verify
+on:
+  push:
+    paths:
+      - ".github/workflows/verify.yml"
+  workflow_dispatch:
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live build
+        run: |
+          for u in "https://paisatrack-app.netlify.app/" "https://paisatrack-app.netlify.app/api/sync?key=0123456789abcdef"; do
+            echo "--- $u"
+            curl -sS -o /tmp/b -w 'HTTP %{http_code} bytes=%{size_download}\n' --max-time 25 "$u"
+            echo "body: $(head -c 160 /tmp/b)"
+          done
+          echo "langs-in-html: $(curl -sS --max-time 25 https://paisatrack-app.netlify.app/ | grep -c 'var LANGS')"
+          echo "delete-undo-in-html: $(curl -sS --max-time 25 https://paisatrack-app.netlify.app/ | grep -c 'toast-action')"
