@@ -1,0 +1,18 @@
+name: verify
+on:
+  push:
+    paths:
+      - ".github/workflows/verify.yml"
+  workflow_dispatch:
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live build
+        run: |
+          curl -sS --max-time 25 -o /tmp/b -w 'site HTTP %{http_code} bytes=%{size_download}\n' https://paisatrack-app.netlify.app/
+          echo "lang-btn: $(grep -c 'id=\"lang-btn\"' /tmp/b)"
+          echo "search-input: $(grep -c 'id=\"lang-search\"' /tmp/b)"
+          echo "searchLang-key: $(grep -c 'searchLang' /tmp/b)"
+          echo "langs-tuples: $(grep -c '\"English\",\"English\"' /tmp/b)"
+          curl -sS --max-time 25 -o /tmp/s -w 'sync HTTP %{http_code} ' 'https://paisatrack-app.netlify.app/api/sync?key=0123456789abcdef'; echo "body=$(head -c 60 /tmp/s)"
