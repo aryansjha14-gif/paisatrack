@@ -14,8 +14,8 @@ jobs:
       - name: Server side probe
         run: |
           cat > probe.py <<'PYEOF'
-          import hashlib, json, time, urllib.request, urllib.error
-          key = hashlib.sha256(b"probe@example.com|demo1234").hexdigest()
+          import json, os, time, urllib.request, urllib.error
+          key = os.urandom(32).hex()
           base = "https://paisatrack-app.netlify.app/api/sync"
           def call(method, url, data=None):
               req = urllib.request.Request(url, method=method)
@@ -25,43 +25,33 @@ jobs:
                   req.add_header("content-type", "application/json")
               try:
                   with urllib.request.urlopen(req, body, timeout=30) as r:
-                      return (r.status, r.read()[:200].decode("utf-8", "replace"))
+                      return (r.status, r.read()[:160].decode("utf-8", "replace"))
               except urllib.error.HTTPError as e:
-                  return (e.code, e.read()[:200].decode("utf-8", "replace"))
-          print("GET-unknown:", call("GET", base + "?key=" + key))
+                  return (e.code, e.read()[:160].decode("utf-8", "replace"))
+          print("GET fresh (expect 404):", call("GET", base + "?key=" + key))
           print("POST:", call("POST", base, {"key": key, "payload": {"iv": "aXY=", "data": "ZGF0YQ=="}}))
-          print("GET-immediate:", call("GET", base + "?key=" + key))
-          time.sleep(6)
-          print("GET-after-6s:", call("GET", base + "?key=" + key))
-          time.sleep(12)
-          print("GET-after-18s:", call("GET", base + "?key=" + key))
+          print("GET immediately (expect 200):", call("GET", base + "?key=" + key))
+          print("GET again:", call("GET", base + "?key=" + key))
+          print("bad key (expect 400):", call("GET", base + "?key=short"))
           PYEOF
           python3 probe.py
       - name: Browser probe
         run: |
           npm init -y > /dev/null 2>&1
           npm i puppeteer-core --no-save > /dev/null 2>&1
-          echo "installed: $(ls node_modules | grep -c puppeteer || echo 0)"
           cat > b.mjs <<'JSEOF'
           import puppeteer from 'puppeteer-core';
           const b = await puppeteer.launch({ executablePath: process.env.CHROME_PATH, headless: 'new', args: ['--no-sandbox','--disable-gpu','--disable-dev-shm-usage'] });
           const p = await b.newPage();
-          const hits = [];
-          p.on('response', async r => {
-            if (r.url().includes('/api/sync')) {
-              let t = ''; try { t = (await r.text()).slice(0, 260); } catch (e) {}
-              hits.push(r.request().method() + ' ' + r.status() + ' :: ' + t);
-            }
-          });
           await p.goto('https://paisatrack-app.netlify.app/', { waitUntil: 'networkidle2', timeout: 60000 });
           await p.click('#sync-toggle');
           await new Promise(r => setTimeout(r, 500));
           await p.type('#sync-email', 'probe@example.com');
           await p.type('#sync-secret', 'demo1234');
           await p.click('#sync-now');
-          await new Promise(r => setTimeout(r, 10000));
-          console.log('SYNC-MSG: ' + await p.$eval('#sync-msg', el => el.textContent));
-          console.log('SYNC-REQS: ' + JSON.stringify(hits));
+          await new Promise(r => setTimeout(r, 12000));
+          console.log('SYNC-MSG-1: ' + await p.$eval('#sync-msg', el => el.textContent));
+          console.log('SYNC-LAST: ' + await p.$eval('#sync-body', el => el.textContent));
           await b.close();
           JSEOF
           CHROME_PATH=$(which google-chrome || which google-chrome-stable) node b.mjs
