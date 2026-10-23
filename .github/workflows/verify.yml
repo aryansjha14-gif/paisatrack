@@ -13,8 +13,8 @@ jobs:
           node-version: "20"
       - name: Server side probe
         run: |
-          cat > /tmp/probe.py <<'PYEOF'
-          import hashlib, json, urllib.request, urllib.error
+          cat > probe.py <<'PYEOF'
+          import hashlib, json, time, urllib.request, urllib.error
           key = hashlib.sha256(b"probe@example.com|demo1234").hexdigest()
           base = "https://paisatrack-app.netlify.app/api/sync"
           def call(method, url, data=None):
@@ -29,22 +29,27 @@ jobs:
               except urllib.error.HTTPError as e:
                   return (e.code, e.read()[:200].decode("utf-8", "replace"))
           print("GET-unknown:", call("GET", base + "?key=" + key))
-          print("GET-badkey:", call("GET", base + "?key=short"))
           print("POST:", call("POST", base, {"key": key, "payload": {"iv": "aXY=", "data": "ZGF0YQ=="}}))
-          print("GET-after:", call("GET", base + "?key=" + key))
+          print("GET-immediate:", call("GET", base + "?key=" + key))
+          time.sleep(6)
+          print("GET-after-6s:", call("GET", base + "?key=" + key))
+          time.sleep(12)
+          print("GET-after-18s:", call("GET", base + "?key=" + key))
           PYEOF
-          python3 /tmp/probe.py
+          python3 probe.py
       - name: Browser probe
         run: |
-          npm i puppeteer-core --no-save --silent > /dev/null 2>&1 || true
-          cat > /tmp/b.mjs <<'JSEOF'
+          npm init -y > /dev/null 2>&1
+          npm i puppeteer-core --no-save > /dev/null 2>&1
+          echo "installed: $(ls node_modules | grep -c puppeteer || echo 0)"
+          cat > b.mjs <<'JSEOF'
           import puppeteer from 'puppeteer-core';
           const b = await puppeteer.launch({ executablePath: process.env.CHROME_PATH, headless: 'new', args: ['--no-sandbox','--disable-gpu','--disable-dev-shm-usage'] });
           const p = await b.newPage();
           const hits = [];
           p.on('response', async r => {
             if (r.url().includes('/api/sync')) {
-              let t = ''; try { t = (await r.text()).slice(0, 240); } catch (e) {}
+              let t = ''; try { t = (await r.text()).slice(0, 260); } catch (e) {}
               hits.push(r.request().method() + ' ' + r.status() + ' :: ' + t);
             }
           });
@@ -54,9 +59,9 @@ jobs:
           await p.type('#sync-email', 'probe@example.com');
           await p.type('#sync-secret', 'demo1234');
           await p.click('#sync-now');
-          await new Promise(r => setTimeout(r, 9000));
+          await new Promise(r => setTimeout(r, 10000));
           console.log('SYNC-MSG: ' + await p.$eval('#sync-msg', el => el.textContent));
           console.log('SYNC-REQS: ' + JSON.stringify(hits));
           await b.close();
           JSEOF
-          CHROME_PATH=$(which google-chrome || which google-chrome-stable) node /tmp/b.mjs
+          CHROME_PATH=$(which google-chrome || which google-chrome-stable) node b.mjs
