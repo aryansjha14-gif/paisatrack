@@ -8,16 +8,20 @@ jobs:
   v:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify both live sites
+      - name: Compare live builds
         run: |
-          for base in https://paisatrack-app.netlify.app https://aryansjha14-gif.github.io/paisatrack; do
-            echo "===== $base"
-            curl -sS --max-time 30 -o /tmp/i.html -w 'index HTTP %{http_code} bytes=%{size_download}\n' "$base/"
-            echo "sha256=$(sha256sum /tmp/i.html | cut -d' ' -f1)"
-            echo "lang-btn=$(grep -c 'id=\"lang-btn\"' /tmp/i.html) lang-search=$(grep -c 'id=\"lang-search\"' /tmp/i.html) toast-action=$(grep -c 'toast-action' /tmp/i.html) cat_food=$(grep -c 'cat_food' /tmp/i.html)"
-            curl -sS --max-time 25 -o /dev/null -w 'manifest HTTP %{http_code} bytes=%{size_download}\n' "$base/manifest.webmanifest"
-            curl -sS --max-time 25 -o /dev/null -w 'icon180 HTTP %{http_code}\n' "$base/icon-180.png"
-            curl -sS --max-time 25 -o /dev/null -w 'icon512 HTTP %{http_code}\n' "$base/icon-512.png"
-          done
-          echo "===== sync function"
-          curl -sS --max-time 25 -o /tmp/s -w 'sync HTTP %{http_code} ' 'https://paisatrack-app.netlify.app/api/sync?key=0123456789abcdef'; echo "body=$(head -c 60 /tmp/s)"
+          curl -sS --max-time 30 -o /tmp/n.html https://paisatrack-app.netlify.app/
+          curl -sS --max-time 30 -o /tmp/g.html https://aryansjha14-gif.github.io/paisatrack/
+          echo "netlify bytes=$(wc -c </tmp/n.html) ghpages bytes=$(wc -c </tmp/g.html)"
+          echo "--- lines only in NETLIFY ---"
+          diff /tmp/g.html /tmp/n.html | grep '^>' | head -20
+      - name: Render live Netlify site in headless Chrome
+        run: |
+          google-chrome --headless=new --no-sandbox --disable-gpu --dump-dom --virtual-time-budget=7000 https://paisatrack-app.netlify.app/ > /tmp/dom.html 2>/dev/null || echo 'chrome exited nonzero'
+          echo "dom bytes=$(wc -c </tmp/dom.html)"
+          echo "title: $(grep -o '<title>[^<]*</title>' /tmp/dom.html | head -1)"
+          echo "lang-current present: $(grep -c 'id=\"lang-current\"' /tmp/dom.html)"
+          echo "category options rendered: $(grep -c 'Food and dining' /tmp/dom.html)"
+          echo "stat value rendered: $(grep -c 's-balance' /tmp/dom.html)"
+          echo "empty state rendered: $(grep -c 'No transactions yet' /tmp/dom.html)"
+          echo "toast-action rendered: $(grep -c 'toast-action' /tmp/dom.html)"
