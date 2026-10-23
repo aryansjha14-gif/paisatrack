@@ -1,0 +1,23 @@
+name: verify
+on:
+  push:
+    paths:
+      - ".github/workflows/verify.yml"
+  workflow_dispatch:
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify both live sites
+        run: |
+          for base in https://paisatrack-app.netlify.app https://aryansjha14-gif.github.io/paisatrack; do
+            echo "===== $base"
+            curl -sS --max-time 30 -o /tmp/i.html -w 'index HTTP %{http_code} bytes=%{size_download}\n' "$base/"
+            echo "sha256=$(sha256sum /tmp/i.html | cut -d' ' -f1)"
+            echo "lang-btn=$(grep -c 'id=\"lang-btn\"' /tmp/i.html) lang-search=$(grep -c 'id=\"lang-search\"' /tmp/i.html) toast-action=$(grep -c 'toast-action' /tmp/i.html) cat_food=$(grep -c 'cat_food' /tmp/i.html)"
+            curl -sS --max-time 25 -o /dev/null -w 'manifest HTTP %{http_code} bytes=%{size_download}\n' "$base/manifest.webmanifest"
+            curl -sS --max-time 25 -o /dev/null -w 'icon180 HTTP %{http_code}\n' "$base/icon-180.png"
+            curl -sS --max-time 25 -o /dev/null -w 'icon512 HTTP %{http_code}\n' "$base/icon-512.png"
+          done
+          echo "===== sync function"
+          curl -sS --max-time 25 -o /tmp/s -w 'sync HTTP %{http_code} ' 'https://paisatrack-app.netlify.app/api/sync?key=0123456789abcdef'; echo "body=$(head -c 60 /tmp/s)"
