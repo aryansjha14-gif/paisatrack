@@ -10,6 +10,36 @@ const json = (obj, status = 200) =>
     },
   });
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Netlify Blobs is eventually consistent by default and can throw transient
+ * "internal error (403)" responses. Both are handled here:
+ *   - the store is opened with strong consistency so a read right after a
+ *     write on another device returns the newest value;
+ *   - every store call is retried a few times with a small backoff.
+ */
+function makeStore() {
+  try {
+    return getStore({ name: "paisatrack", consistency: "strong" });
+  } catch (e) {
+    return getStore("paisatrack");
+  }
+}
+
+async function withRetry(fn, tries = 3) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      await sleep(120 * (i + 1));
+    }
+  }
+  throw last;
+}
+
 /**
  * Encrypted cross-device sync endpoint.
  *
@@ -27,7 +57,6 @@ export default async (req) => {
     return new Response(null, { status: 204 });
   }
 
-  const store = getStore("paisatrack");
   const url = new URL(req.url);
 
   if (method === "GET") {
@@ -35,9 +64,9 @@ export default async (req) => {
     if (key.length < 16 || key.length > 200) return json({ error: "bad key" }, 400);
     let rec = null;
     try {
-      rec = await store.get(key, { type: "json" });
+      rec = await withRetry(() => makeStore().get(key, { type: "json" }));
     } catch (e) {
-      return json({ error: "read failed" }, 500);
+      return json({ error: "read failed" }, 503);
     }
     if (!rec) return json({ error: "not found" }, 404);
     return json(rec);
@@ -62,9 +91,9 @@ export default async (req) => {
     }
     const rec = { payload, updatedAt: Date.now() };
     try {
-      await store.setJSON(body.key, rec);
+      await withRetry(() => makeStore().setJSON(body.key, rec));
     } catch (e) {
-      return json({ error: "write failed" }, 500);
+      return json({ error: "write failed" }, 503);
     }
     return json({ ok: true, updatedAt: rec.updatedAt });
   }
