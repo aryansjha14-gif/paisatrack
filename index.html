@@ -996,6 +996,20 @@ var LANGS = [["en", "English", "English"], ["hi", "हिन्दी", "Hindi"]
     el.textContent = msg || "";
     el.style.color = kind==="err" ? "#be123c" : (kind==="ok" ? "#047857" : "");
   }
+  async function fetchWithRetry(url, opts, tries){
+    tries = tries || 3;
+    var last = null, r = null, i;
+    for(i = 0; i < tries; i++){
+      try{
+        r = await fetch(url, opts);
+        if(r.status !== 403 && r.status !== 408 && r.status !== 429 && r.status < 500) return r;
+        last = new Error("HTTP " + r.status);
+      }catch(e){ last = e; r = null; }
+      await new Promise(function(res){ setTimeout(res, 500 * (i + 1)); });
+    }
+    if(r) return r;
+    throw (last || new Error("network error"));
+  }
   async function doSync(){
     if(!syncSupported()){ setSyncMsg(T("syncUnsupported"), "err"); return; }
     var email = document.getElementById("sync-email").value.trim();
@@ -1006,7 +1020,7 @@ var LANGS = [["en", "English", "English"], ["hi", "हिन्दी", "Hindi"]
     btn.disabled = true;
     try{
       var keys = await deriveKeys(email, secret);
-      var res = await fetch(SYNC_ENDPOINT + "?key=" + encodeURIComponent(keys.id), { method:"GET", headers:{ "accept":"application/json" } });
+      var res = await fetchWithRetry(SYNC_ENDPOINT + "?key=" + encodeURIComponent(keys.id), { method:"GET", headers:{ "accept":"application/json" } });
       if(res.status === 404){ /* nothing remote yet */ }
       else if(res.ok){
         var body = await res.json();
@@ -1018,7 +1032,7 @@ var LANGS = [["en", "English", "English"], ["hi", "हिन्दी", "Hindi"]
         throw new Error("pull " + res.status);
       }
       var payload = await encryptPayload(keys.key, { tx:state.tx, tomb:state.tomb, updatedAt:Date.now() });
-      var put = await fetch(SYNC_ENDPOINT, {
+      var put = await fetchWithRetry(SYNC_ENDPOINT, {
         method:"POST", headers:{ "content-type":"application/json" },
         body: JSON.stringify({ key: keys.id, payload: payload })
       });
