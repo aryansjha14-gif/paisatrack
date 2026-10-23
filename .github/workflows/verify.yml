@@ -1,0 +1,62 @@
+name: verify
+on:
+  push:
+    paths:
+      - ".github/workflows/verify.yml"
+  workflow_dispatch:
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Server side probe
+        run: |
+          cat > /tmp/probe.py <<'PYEOF'
+          import hashlib, json, urllib.request, urllib.error
+          key = hashlib.sha256(b"probe@example.com|demo1234").hexdigest()
+          base = "https://paisatrack-app.netlify.app/api/sync"
+          def call(method, url, data=None):
+              req = urllib.request.Request(url, method=method)
+              body = None
+              if data is not None:
+                  body = json.dumps(data).encode()
+                  req.add_header("content-type", "application/json")
+              try:
+                  with urllib.request.urlopen(req, body, timeout=30) as r:
+                      return (r.status, r.read()[:200].decode("utf-8", "replace"))
+              except urllib.error.HTTPError as e:
+                  return (e.code, e.read()[:200].decode("utf-8", "replace"))
+          print("GET-unknown:", call("GET", base + "?key=" + key))
+          print("GET-badkey:", call("GET", base + "?key=short"))
+          print("POST:", call("POST", base, {"key": key, "payload": {"iv": "aXY=", "data": "ZGF0YQ=="}}))
+          print("GET-after:", call("GET", base + "?key=" + key))
+          PYEOF
+          python3 /tmp/probe.py
+      - name: Browser probe
+        run: |
+          npm i puppeteer-core --no-save --silent > /dev/null 2>&1 || true
+          cat > /tmp/b.mjs <<'JSEOF'
+          import puppeteer from 'puppeteer-core';
+          const b = await puppeteer.launch({ executablePath: process.env.CHROME_PATH, headless: 'new', args: ['--no-sandbox','--disable-gpu','--disable-dev-shm-usage'] });
+          const p = await b.newPage();
+          const hits = [];
+          p.on('response', async r => {
+            if (r.url().includes('/api/sync')) {
+              let t = ''; try { t = (await r.text()).slice(0, 240); } catch (e) {}
+              hits.push(r.request().method() + ' ' + r.status() + ' :: ' + t);
+            }
+          });
+          await p.goto('https://paisatrack-app.netlify.app/', { waitUntil: 'networkidle2', timeout: 60000 });
+          await p.click('#sync-toggle');
+          await new Promise(r => setTimeout(r, 500));
+          await p.type('#sync-email', 'probe@example.com');
+          await p.type('#sync-secret', 'demo1234');
+          await p.click('#sync-now');
+          await new Promise(r => setTimeout(r, 9000));
+          console.log('SYNC-MSG: ' + await p.$eval('#sync-msg', el => el.textContent));
+          console.log('SYNC-REQS: ' + JSON.stringify(hits));
+          await b.close();
+          JSEOF
+          CHROME_PATH=$(which google-chrome || which google-chrome-stable) node /tmp/b.mjs
